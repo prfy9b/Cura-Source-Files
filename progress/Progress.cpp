@@ -1,22 +1,21 @@
 /** Copyright (C) 2015 Ultimaker - Released under terms of the AGPLv3 License */
 #include "Progress.h"
-
-#include "../commandSocket.h"
+#include <assert.h>
 #include "../utils/gettime.h"
 
 namespace cura {
-    
-double Progress::times [] = 
-{ 
-    0.0,    // START   = 0, 
-    5.269,  // SLICING = 1, 
-    1.533,  // PARTS   = 2, 
+
+double Progress::times [] =
+{
+    0.0,    // START   = 0,
+    5.269,  // SLICING = 1,
+    1.533,  // PARTS   = 2,
     71.811, // INSET_SKIN = 3
-    51.009, // SUPPORT = 4, 
-    154.62, // EXPORT  = 5, 
+    51.009, // SUPPORT = 4,
+    154.62, // EXPORT  = 5,
     0.1     // FINISH  = 6
 };
-std::string Progress::names [] = 
+std::string Progress::names [] =
 {
     "start",
     "slice",
@@ -27,20 +26,20 @@ std::string Progress::names [] =
     "process"
 };
 
-    
+
 double Progress::accumulated_times [N_PROGRESS_STAGES] = {-1};
 double Progress::total_timing = -1;
 
 /*
-const Progress::Stage Progress::stages[] = 
-{ 
-    Progress::Stage::START, 
-    Progress::Stage::SLICING, 
-    Progress::Stage::PARTS, 
-    Progress::Stage::INSET_SKIN, 
-    Progress::Stage::SUPPORT, 
-    Progress::Stage::EXPORT, 
-    Progress::Stage::FINISH 
+const Progress::Stage Progress::stages[] =
+{
+    Progress::Stage::START,
+    Progress::Stage::SLICING,
+    Progress::Stage::PARTS,
+    Progress::Stage::INSET_SKIN,
+    Progress::Stage::SUPPORT,
+    Progress::Stage::EXPORT,
+    Progress::Stage::FINISH
 };
 */
 
@@ -66,21 +65,12 @@ void Progress::init()
 void Progress::messageProgress(Progress::Stage stage, int progress_in_stage, int progress_in_stage_max)
 {
     float percentage = calcOverallProgress(stage, float(progress_in_stage) / float(progress_in_stage_max));
-    if (CommandSocket::getInstance())
-    {
-        CommandSocket::getInstance()->sendProgress(percentage);
-    }
-    
+
     logProgress(names[(int)stage].c_str(), progress_in_stage, progress_in_stage_max, percentage);
 }
 
 void Progress::messageProgressStage(Progress::Stage stage, TimeKeeper* time_keeper)
 {
-    if (CommandSocket::getInstance())
-    {
-        CommandSocket::getInstance()->sendProgressStage(stage);
-    }
-    
     if (time_keeper)
     {
         if ((int)stage > 0)
@@ -91,7 +81,7 @@ void Progress::messageProgressStage(Progress::Stage stage, TimeKeeper* time_keep
         {
             time_keeper->restart();
         }
-        
+
         if ((int)stage < (int)Stage::FINISH)
             log("Starting %s...\n", names[(int)stage].c_str());
     }

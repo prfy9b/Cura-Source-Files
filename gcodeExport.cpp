@@ -649,7 +649,6 @@ void GCodeExport::writeTravel(int x, int y, int z, double speed)
 
     const PrintFeatureType travel_move_type = extruder_attr[current_extruder].retraction_e_amount_current ? PrintFeatureType::MoveRetraction : PrintFeatureType::MoveCombing;
     const int display_width = extruder_attr[current_extruder].retraction_e_amount_current ? MM2INT(0.2) : MM2INT(0.1);
-    CommandSocket::sendLineTo(travel_move_type, Point(x, y), display_width, layer_height, speed);
 
     *output_stream << "G0";
     writeFXYZE(speed, x, y, z, current_e_value, travel_move_type);
@@ -930,9 +929,6 @@ void GCodeExport::startExtruder(int new_extruder)
             writeExtrusionMode(true); // restore relative extrusion mode
         }
     }
-
-    CommandSocket::setExtruderForSend(new_extruder);
-    CommandSocket::setSendCurrentPosition( getPositionXY() );
 
     //Change the Z position so it gets re-written again. We do not know if the switch code modified the Z position.
     currentPosition.z += 1;

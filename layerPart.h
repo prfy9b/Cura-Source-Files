@@ -4,7 +4,7 @@
 
 #include "sliceDataStorage.h"
 #include "slicer.h"
-#include "commandSocket.h"
+
 
 /*
 The layer-part creation step is the first step in creating actual useful data for 3D printing.

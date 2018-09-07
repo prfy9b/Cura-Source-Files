@@ -1,9 +1,9 @@
 //Copyright (c) 2018 Ultimaker B.V.
 //CuraEngine is released under the terms of the AGPLv3 or higher.
 
-#include "FffProcessor.h" 
+#include "FffProcessor.h"
 
-namespace cura 
+namespace cura
 {
 
 FffProcessor FffProcessor::instance; // definition must be in cpp
@@ -29,7 +29,7 @@ std::string FffProcessor::getAllSettingsString(MeshGroup& meshgroup, bool first_
         sstream << getAllLocalSettingsString(); // global settings
         sstream << " -g";
     }
-    else 
+    else
     {
         sstream << " --next";
     }
@@ -79,20 +79,20 @@ bool FffProcessor::processMeshGroup(MeshGroup* meshgroup)
         profile_string += getAllSettingsString(*meshgroup, meshgroup_number == 0);
         return true;
     }
-    
+
     if (meshgroup->getSettingBoolean("wireframe_enabled"))
     {
         log("starting Neith Weaver...\n");
-                    
+
         Weaver w(this);
         w.weave(meshgroup);
-        
+
         log("starting Neith Gcode generation...\n");
         Wireframe2gcode gcoder(w, gcode_writer.gcode, this);
         gcoder.writeGCode();
         log("finished Neith Gcode generation...\n");
-        
-    } else 
+
+    } else
     {
         SliceDataStorage storage(meshgroup);
 
@@ -100,17 +100,12 @@ bool FffProcessor::processMeshGroup(MeshGroup* meshgroup)
         {
             return false;
         }
-        
+
         Progress::messageProgressStage(Progress::Stage::EXPORT, &time_keeper);
         gcode_writer.writeGCode(storage, time_keeper);
     }
 
     Progress::messageProgress(Progress::Stage::FINISH, 1, 1); // 100% on this meshgroup
-    if (CommandSocket::isInstantiated())
-    {
-        CommandSocket::getInstance()->flushGcode();
-        CommandSocket::getInstance()->sendOptimizedLayerData();
-    }
     log("Total time elapsed %5.2fs.\n", time_keeper_total.restart());
 
     profile_string += getAllSettingsString(*meshgroup, meshgroup_number == 0);
@@ -122,4 +117,4 @@ bool FffProcessor::processMeshGroup(MeshGroup* meshgroup)
     return true;
 }
 
-} // namespace cura 
+} // namespace cura

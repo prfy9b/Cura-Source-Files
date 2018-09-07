@@ -17,8 +17,6 @@
 #include "FffProcessor.h"
 #include "settings/SettingRegistry.h"
 
-#include "settings/SettingsToGV.h"
-
 #ifdef _OPENMP
     #include <omp.h> // omp_get_num_threads
 #endif // _OPENMP
@@ -40,8 +38,6 @@ void print_usage()
     logAlways("CuraEngine help\n");
     logAlways("\tShow this help message\n");
     logAlways("\n");
-    logAlways("CuraEngine connect <host>[:<port>] [-j <settings.def.json>]\n");
-    logAlways("  --connect <host>[:<port>]\n\tConnect to <host> via a command socket, \n\tinstead of passing information via the command line\n");
     logAlways("  -j<settings.def.json>\n\tLoad settings.json file to register all settings and their defaults\n");
     logAlways("  -v\n\tIncrease the verbose level (show log messages).\n");
 #ifdef _OPENMP
@@ -83,66 +79,6 @@ void print_call(int argc, char **argv)
     for (int idx= 0; idx < argc; idx++)
         cura::logError("%s ", argv[idx]);
     cura::logError("\n");
-}
-
-void connect(int argc, char **argv)
-{
-    std::string ip;
-    int port = 49674;
-
-    // parse ip port
-    std::string ip_port(argv[2]);
-    if (ip_port.find(':') != std::string::npos)
-    {
-        ip = ip_port.substr(0, ip_port.find(':'));
-        port = std::stoi(ip_port.substr(ip_port.find(':') + 1).data());
-    }
-
-#ifdef _OPENMP
-    int n_threads;
-#endif // _OPENMP
-
-    for(int argn = 3; argn < argc; argn++)
-    {
-        char* str = argv[argn];
-        if (str[0] == '-')
-        {
-            for(str++; *str; str++)
-            {
-                switch(*str)
-                {
-                case 'v':
-                    cura::increaseVerboseLevel();
-                    break;
-#ifdef _OPENMP
-                case 'm':
-                    str++;
-                    n_threads = std::strtol(str, &str, 10);
-                    str--;
-                    n_threads = std::max(1, n_threads);
-                    omp_set_num_threads(n_threads);
-                    break;
-#endif // _OPENMP
-                case 'j':
-                    argn++;
-                    if (SettingRegistry::getInstance()->loadJSONsettings(argv[argn], FffProcessor::getInstance()))
-                    {
-                        cura::logError("Failed to load json file: %s\n", argv[argn]);
-                        std::exit(1);
-                    }
-                    break;
-                default:
-                    cura::logError("Unknown option: %c\n", *str);
-                    print_call(argc, argv);
-                    print_usage();
-                    break;
-                }
-            }
-        }
-    }
-
-    CommandSocket::instantiate();
-    CommandSocket::getInstance()->connect(ip, port);
 }
 
 void slice(int argc, char **argv)
@@ -382,90 +318,13 @@ int main(int argc, char **argv)
 #endif
         }
     }
-
-    if (stringcasecompare(argv[1], "connect") == 0)
-    {
-        connect(argc, argv);
-    }
-    else if (stringcasecompare(argv[1], "slice") == 0)
+    if (stringcasecompare(argv[1], "slice") == 0)
     {
         slice(argc, argv);
     }
     else if (stringcasecompare(argv[1], "help") == 0)
     {
         print_usage();
-        exit(0);
-    }
-    else if (stringcasecompare(argv[1], "analyse") == 0)
-    { // CuraEngine analyse [json] [output.gv] [engine_settings] -[p|i|e|w]
-        // p = show parent-child relations
-        // i = show inheritance function
-        // e = show error functions
-        // w = show warning functions
-        // dot refl_ff.gv -Tpng > rafl_ff_dotted.png
-        // see meta/HOWTO.txt
-
-        bool parent_child_viz = false;
-        bool inherit_viz = false;
-        bool warning_viz = false;
-        bool error_viz = false;
-        bool global_only_viz = false;
-        if (argc >= 6)
-        {
-            char* str = argv[5];
-            if (str[0] == '-')
-            {
-                for(str++; *str; str++)
-                {
-                    switch(*str)
-                    {
-                    case 'p':
-                        parent_child_viz = true;
-                        break;
-                    case 'i':
-                        inherit_viz = true;
-                        break;
-                    case 'e':
-                        error_viz = true;
-                        break;
-                    case 'w':
-                        warning_viz = true;
-                        break;
-                    case 'g':
-                        global_only_viz = true;
-                        break;
-                    default:
-                        cura::logError("Unknown option: %c\n", *str);
-                        print_call(argc, argv);
-                        print_usage();
-                        break;
-                    }
-                }
-            }
-        }
-        else
-        {
-            cura::log("\n");
-            cura::log("usage:\n");
-            cura::log("CuraEngine analyse <fdmPrinter.def.json> <output.gv> <engine_settings_list> -[p|i|e|w]\n");
-            cura::log("\tGenerate a grpah to visualize the setting inheritance structure.\n");
-            cura::log("\t<fdmPrinter.def.json>\n\tThe base seting definitions file.\n");
-            cura::log("\t<output.gv>\n\tThe output file.\n");
-            cura::log("\t<engine_settings_list>\n\tA text file with all setting keys used in the engine, separated by newlines.\n");
-            cura::log("\t-[p|i|e|w]\n\tOptions for what to include in the visualization\n");
-            cura::log("\t\tp\tVisualize the parent-child relationship.\n");
-            cura::log("\t\ti\tVisualize inheritance function relationships.\n");
-            cura::log("\t\te\tVisualize (max/min) error function relationships.\n");
-            cura::log("\t\tw\tVisualize (max/min) warning function relationships.\n");
-            cura::log("\n");
-
-        }
-
-        SettingsToGv gv_out(argv[3], argv[4], parent_child_viz, inherit_viz, error_viz, warning_viz, global_only_viz);
-        if (gv_out.generate(std::string(argv[2])))
-        {
-            cura::logError("Failed to analyse json file: %s\n", argv[2]);
-        }
         exit(0);
     }
     else

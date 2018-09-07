@@ -10,7 +10,7 @@
 #include "PrintFeature.h"
 #include "pathOrderOptimizer.h" //For skirt/brim.
 
-namespace cura 
+namespace cura
 {
 
 
@@ -21,12 +21,9 @@ void Wireframe2gcode::writeGCode()
 
     const unsigned int start_extruder_nr = getSettingAsIndex("adhesion_extruder_nr"); // TODO: figure out how Wireframe works with dual extrusion
     gcode.setInitialTemps(*wireFrame.meshgroup, start_extruder_nr);
-    
-    if (CommandSocket::getInstance())
-        CommandSocket::getInstance()->beginGCode();
-    
+
     processStartingCode();
-    
+
     int maxObjectHeight;
     if (wireFrame.layers.empty())
     {
@@ -54,29 +51,29 @@ void Wireframe2gcode::writeGCode()
             gcode.writeExtrusion(segment_to, speedBottom, extrusion_mm3_per_mm_flat, PrintFeatureType::Skin);
         }
     }
-    
-    
-    
+
+
+
     // bottom:
     Polygons empty_outlines;
-    writeFill(wireFrame.bottom_infill.roof_insets, empty_outlines, 
+    writeFill(wireFrame.bottom_infill.roof_insets, empty_outlines,
               [this](Wireframe2gcode&, WeaveConnectionPart& part, unsigned int segment_idx) {
-                    WeaveConnectionSegment& segment = part.connection.segments[segment_idx]; 
-                    if (segment.segmentType == WeaveSegmentType::MOVE || segment.segmentType == WeaveSegmentType::DOWN_AND_FLAT) // this is the case when an inset overlaps with a hole 
+                    WeaveConnectionSegment& segment = part.connection.segments[segment_idx];
+                    if (segment.segmentType == WeaveSegmentType::MOVE || segment.segmentType == WeaveSegmentType::DOWN_AND_FLAT) // this is the case when an inset overlaps with a hole
                     {
-                        writeMoveWithRetract(segment.to); 
-                    } else 
+                        writeMoveWithRetract(segment.to);
+                    } else
                     {
                         gcode.writeExtrusion(segment.to, speedBottom, extrusion_mm3_per_mm_connection, PrintFeatureType::Skin);
                     }
-                }   
-            , 
+                }
+            ,
               [this](Wireframe2gcode&, WeaveConnectionSegment& segment) {
                     if (segment.segmentType == WeaveSegmentType::MOVE)
                         writeMoveWithRetract(segment.to);
                     else if (segment.segmentType == WeaveSegmentType::DOWN_AND_FLAT)
                         return; // do nothing
-                    else 
+                    else
                         gcode.writeExtrusion(segment.to, speedBottom, extrusion_mm3_per_mm_flat, PrintFeatureType::Skin);
                 }
             );
@@ -84,22 +81,22 @@ void Wireframe2gcode::writeGCode()
     for (unsigned int layer_nr = 0; layer_nr < wireFrame.layers.size(); layer_nr++)
     {
         Progress::messageProgress(Progress::Stage::EXPORT, layer_nr+1, total_layers); // abuse the progress system of the normal mode of CuraEngine
-        
+
         WeaveLayer& layer = wireFrame.layers[layer_nr];
-        
+
         gcode.writeLayerComment(layer_nr+1);
-        
+
         double fanSpeed = getSettingInPercentage("cool_fan_speed_max");
         if (layer_nr == 0)
             fanSpeed = getSettingInPercentage("cool_fan_speed_min");
         gcode.writeFanCommand(fanSpeed);
-        
+
         for (unsigned int part_nr = 0; part_nr < layer.connections.size(); part_nr++)
         {
             WeaveConnectionPart& part = layer.connections[part_nr];
-       
+
             if (part.connection.segments.size() == 0) continue;
-            
+
             gcode.writeTypeComment(PrintFeatureType::Support); // connection
             {
                 if (vSize2(gcode.getPositionXY() - part.connection.from) > connectionHeight)
@@ -113,19 +110,19 @@ void Wireframe2gcode::writeGCode()
                     handle_segment(part, segment_idx);
                 }
             }
-            
-            
-            
+
+
+
             gcode.writeTypeComment(PrintFeatureType::OuterWall); // top
             {
                 for (unsigned int segment_idx = 0; segment_idx < part.connection.segments.size(); segment_idx++)
                 {
                     WeaveConnectionSegment& segment = part.connection.segments[segment_idx];
                     if (segment.segmentType == WeaveSegmentType::DOWN) continue;
-                    if (segment.segmentType == WeaveSegmentType::MOVE) 
+                    if (segment.segmentType == WeaveSegmentType::MOVE)
                     {
                         writeMoveWithRetract(segment.to);
-                    } else 
+                    } else
                     {
                         gcode.writeExtrusion(segment.to, speedFlat, extrusion_mm3_per_mm_flat, PrintFeatureType::OuterWall);
                         gcode.writeDelay(flat_delay);
@@ -133,7 +130,7 @@ void Wireframe2gcode::writeGCode()
                 }
             }
         }
-        
+
         // roofs:
         gcode.setZ(layer.z1);
         std::function<void (Wireframe2gcode&, WeaveConnectionPart& part, unsigned int segment_idx)>
@@ -147,32 +144,32 @@ void Wireframe2gcode::writeGCode()
                     } else if (segment.segmentType == WeaveSegmentType::DOWN_AND_FLAT)
                     {
                         // do nothing
-                    } else 
-                    {   
+                    } else
+                    {
                         gcode.writeExtrusion(segment.to, speedFlat, extrusion_mm3_per_mm_flat, PrintFeatureType::Skin);
                         gcode.writeDelay(flat_delay);
                     }
                 });
-        
-     
-        
+
+
+
     }
-    
+
     gcode.setZ(maxObjectHeight);
-    
+
     gcode.writeRetraction(standard_retraction_config);
-    
-    
+
+
     gcode.updateTotalPrintTime();
-    
+
     gcode.writeDelay(0.3);
-    
+
     gcode.writeFanCommand(0);
 
     finalize();
 }
 
-    
+
 void Wireframe2gcode::go_down(WeaveConnectionPart& part, unsigned int segment_idx)
 {
     WeaveConnectionSegment& segment = part.connection.segments[segment_idx];
@@ -182,13 +179,13 @@ void Wireframe2gcode::go_down(WeaveConnectionPart& part, unsigned int segment_id
     if (straight_first_when_going_down <= 0)
     {
         gcode.writeExtrusion(segment.to, speedDown, extrusion_mm3_per_mm_connection, PrintFeatureType::OuterWall);
-    } else 
+    } else
     {
         Point3& to = segment.to;
         Point3 from = gcode.getPosition();// segment.from;
         Point3 vec = to - from;
         Point3 in_between = from + vec * straight_first_when_going_down / 100;
-        
+
         Point3 up(in_between.x, in_between.y, from.z);
         int64_t new_length = (up - from).vSize() + (to - up).vSize() + 5;
         int64_t orr_length = vec.vSize();
@@ -199,13 +196,13 @@ void Wireframe2gcode::go_down(WeaveConnectionPart& part, unsigned int segment_id
     gcode.writeDelay(bottom_delay);
     if (up_dist_half_speed > 0)
     {
-        
+
         gcode.writeExtrusion(Point3(0,0,up_dist_half_speed) + gcode.getPosition(), speedUp / 2, extrusion_mm3_per_mm_connection * 2, PrintFeatureType::OuterWall);
     }
 }
 
 
-    
+
 void Wireframe2gcode::strategy_knot(WeaveConnectionPart& part, unsigned int segment_idx)
 {
     WeaveConnectionSegment& segment = part.connection.segments[segment_idx];
@@ -222,9 +219,9 @@ void Wireframe2gcode::strategy_knot(WeaveConnectionPart& part, unsigned int segm
     Point next_dir_2D(next_vector.x, next_vector.y);
     next_dir_2D = next_dir_2D * top_jump_dist / vSize(next_dir_2D);
     Point3 next_dir (next_dir_2D.X / 2, next_dir_2D.Y / 2, -top_jump_dist);
-    
+
     Point3 current_pos = gcode.getPosition();
-    
+
     gcode.writeTravel(current_pos - next_dir, speedUp);
     gcode.writeDelay(top_delay);
     gcode.writeTravel(current_pos + next_dir_2D, speedUp);
@@ -234,7 +231,7 @@ void Wireframe2gcode::strategy_retract(WeaveConnectionPart& part, unsigned int s
 {
     WeaveConnectionSegment& segment = part.connection.segments[segment_idx];
     Point3 from = (segment_idx == 0)? part.connection.from : part.connection.segments[segment_idx - 1].to;
-    
+
     RetractionConfig retraction_config;
     // TODO: get these from the settings!
     retraction_config.distance = 500; //INT2MM(getSettingInt("retraction_amount"))
@@ -251,7 +248,7 @@ void Wireframe2gcode::strategy_retract(WeaveConnectionPart& part, unsigned int s
     bool after_retract_hop = false;
     //bool go_horizontal_first = true;
     bool lower_retract_start = true;
-    
+
     Point3& to = segment.to;
     if (lower_retract_start)
     {
@@ -264,14 +261,14 @@ void Wireframe2gcode::strategy_retract(WeaveConnectionPart& part, unsigned int s
         gcode.writeDelay(top_retract_pause);
         if (after_retract_hop)
             gcode.writeTravel(to + Point3(0, 0, retract_hop_dist), speedFlat);
-        
-    } else 
+
+    } else
     {
         gcode.writeExtrusion(to, speedUp, extrusion_mm3_per_mm_connection, PrintFeatureType::OuterWall);
         gcode.writeRetraction(retraction_config);
         gcode.writeTravel(to + Point3(0, 0, retract_hop_dist), speedFlat);
         gcode.writeDelay(top_retract_pause);
-        if (after_retract_hop)    
+        if (after_retract_hop)
             gcode.writeTravel(to + Point3(0, 0, retract_hop_dist*3), speedFlat);
         }
 }
@@ -283,7 +280,7 @@ void Wireframe2gcode::strategy_compensate(WeaveConnectionPart& part, unsigned in
     Point3 to = segment.to + Point3(0, 0, fall_down*(segment.to - from).vSize() / connectionHeight);
     Point3 vector = segment.to - from;
     Point3 dir = vector * drag_along / vector.vSize();
-    
+
     Point3 next_point;
     if (segment_idx + 1 < part.connection.segments.size())
     {
@@ -299,18 +296,18 @@ void Wireframe2gcode::strategy_compensate(WeaveConnectionPart& part, unsigned in
     if (next_dir_2D_size > 0)
         next_dir_2D = next_dir_2D * drag_along / next_dir_2D_size;
     Point3 next_dir (next_dir_2D.X, next_dir_2D.Y, 0);
-    
+
     Point3 newTop = to - next_dir + dir;
-    
+
     int64_t orrLength = (segment.to - from).vSize() + next_vector.vSize() + 1; // + 1 in order to avoid division by zero
     int64_t newLength = (newTop - from).vSize() + (next_point - newTop).vSize() + 1; // + 1 in order to avoid division by zero
-    
+
     gcode.writeExtrusion(newTop, speedUp * newLength / orrLength, extrusion_mm3_per_mm_connection * orrLength / newLength, PrintFeatureType::OuterWall);
 }
 void Wireframe2gcode::handle_segment(WeaveConnectionPart& part, unsigned int segment_idx)
 {
     WeaveConnectionSegment& segment = part.connection.segments[segment_idx];
-    
+
     switch(segment.segmentType)
     {
         case WeaveSegmentType::MOVE:
@@ -327,7 +324,7 @@ void Wireframe2gcode::handle_segment(WeaveConnectionPart& part, unsigned int seg
             {
                 strategy_knot(part, segment_idx);
             } else if (strategy == STRATEGY_RETRACT)
-            { 
+            {
                 strategy_retract(part, segment_idx);
             } else if (strategy == STRATEGY_COMPENSATE)
             {
@@ -362,11 +359,11 @@ void Wireframe2gcode::handle_roof_segment(WeaveConnectionPart& part, unsigned in
         case WeaveSegmentType::UP:
             {
                 Point3 to = segment.to + Point3(0, 0, roof_fall_down);
-                
+
                 Point3 vector = segment.to - from;
                 if (vector.vSize2() == 0) return;
                 Point3 dir = vector * roof_drag_along / vector.vSize();
-                
+
                 Point3 next_vector;
                 if (next_segment)
                 {
@@ -377,13 +374,13 @@ void Wireframe2gcode::handle_roof_segment(WeaveConnectionPart& part, unsigned in
                 }
                 Point next_dir_2D(next_vector.x, next_vector.y);
                 Point3 detoured = to + dir;
-                if (vSize2(next_dir_2D) > 0) 
+                if (vSize2(next_dir_2D) > 0)
                 {
                     next_dir_2D = next_dir_2D * roof_drag_along / vSize(next_dir_2D);
                     Point3 next_dir (next_dir_2D.X, next_dir_2D.Y, 0);
                     detoured -= next_dir;
                 }
-                
+
                 gcode.writeExtrusion(detoured, speedUp, extrusion_mm3_per_mm_connection, PrintFeatureType::Skin);
 
             }
@@ -405,19 +402,19 @@ void Wireframe2gcode::writeFill(std::vector<WeaveRoofPart>& infill_insets, Polyg
     , std::function<void (Wireframe2gcode&, WeaveConnectionPart& part, unsigned int segment_idx)> connectionHandler
     , std::function<void (Wireframe2gcode&, WeaveConnectionSegment& p)> flatHandler)
 {
-        
+
     // bottom:
     gcode.writeTypeComment(PrintFeatureType::Infill);
     for (unsigned int inset_idx = 0; inset_idx < infill_insets.size(); inset_idx++)
     {
         WeaveRoofPart& inset = infill_insets[inset_idx];
-        
-        
+
+
         for (unsigned int inset_part_nr = 0; inset_part_nr < inset.connections.size(); inset_part_nr++)
         {
             WeaveConnectionPart& inset_part = inset.connections[inset_part_nr];
             std::vector<WeaveConnectionSegment>& segments = inset_part.connection.segments;
-            
+
             gcode.writeTypeComment(PrintFeatureType::Support); // connection
             if (segments.size() == 0) continue;
             Point3 first_extrusion_from = inset_part.connection.from;
@@ -433,7 +430,7 @@ void Wireframe2gcode::writeFill(std::vector<WeaveRoofPart>& infill_insets, Polyg
             {
                 connectionHandler(*this, inset_part, segment_idx);
             }
-            
+
             gcode.writeTypeComment(PrintFeatureType::InnerWall); // top
             for (unsigned int segment_idx = 0; segment_idx < segments.size(); segment_idx++)
             {
@@ -441,13 +438,13 @@ void Wireframe2gcode::writeFill(std::vector<WeaveRoofPart>& infill_insets, Polyg
 
                 if (segment.segmentType == WeaveSegmentType::DOWN) continue;
 
-                flatHandler(*this, segment); 
+                flatHandler(*this, segment);
             }
         }
-        
-        
+
+
     }
-    
+
     gcode.writeTypeComment(PrintFeatureType::OuterWall); // outer perimeter of the flat parts
     for (PolygonRef poly : roof_outlines)
     {
@@ -456,7 +453,7 @@ void Wireframe2gcode::writeFill(std::vector<WeaveRoofPart>& infill_insets, Polyg
         {
             Point3 to(p.X, p.Y, gcode.getPositionZ());
             WeaveConnectionSegment segment(to, WeaveSegmentType::FLAT);
-            flatHandler(*this, segment); 
+            flatHandler(*this, segment);
         }
     }
 }
@@ -478,18 +475,18 @@ void Wireframe2gcode::writeMoveWithRetract(Point to)
     gcode.writeTravel(to, moveSpeed);
 }
 
-Wireframe2gcode::Wireframe2gcode(Weaver& weaver, GCodeExport& gcode, SettingsBase* settings_base) 
-: SettingsMessenger(settings_base) 
+Wireframe2gcode::Wireframe2gcode(Weaver& weaver, GCodeExport& gcode, SettingsBase* settings_base)
+: SettingsMessenger(settings_base)
 , gcode(gcode)
 , wireFrame(weaver.wireFrame)
 {
     initial_layer_thickness = getSettingInMicrons("layer_height_0");
-    connectionHeight = getSettingInMicrons("wireframe_height"); 
-    roof_inset = getSettingInMicrons("wireframe_roof_inset"); 
-    
+    connectionHeight = getSettingInMicrons("wireframe_height");
+    roof_inset = getSettingInMicrons("wireframe_roof_inset");
+
     filament_diameter = getSettingInMicrons("material_diameter");
     line_width = getSettingInMicrons("wall_line_width_x");
-    
+
     flowConnection = getSettingInPercentage("wireframe_flow_connection");
     flowFlat = getSettingInPercentage("wireframe_flow_flat");
 
@@ -504,7 +501,7 @@ Wireframe2gcode::Wireframe2gcode(Weaver& weaver, GCodeExport& gcode, SettingsBas
     nozzle_expansion_angle = getSettingInAngleRadians("machine_nozzle_expansion_angle");  //     \_U_/       .
     nozzle_clearance = getSettingInMicrons("wireframe_nozzle_clearance");    // at least line width
     nozzle_top_diameter = tan(nozzle_expansion_angle) * connectionHeight + nozzle_outer_diameter + nozzle_clearance;
-    
+
     moveSpeed = 40;
     speedBottom =  getSettingInMillimetersPerSecond("wireframe_printspeed_bottom");
     speedUp = getSettingInMillimetersPerSecond("wireframe_printspeed_up");
@@ -514,14 +511,14 @@ Wireframe2gcode::Wireframe2gcode(Weaver& weaver, GCodeExport& gcode, SettingsBas
     flat_delay = getSettingInSeconds("wireframe_flat_delay");
     bottom_delay = getSettingInSeconds("wireframe_bottom_delay");
     top_delay = getSettingInSeconds("wireframe_top_delay");
-    
+
     up_dist_half_speed = getSettingInMicrons("wireframe_up_half_speed");
-    
+
     top_jump_dist = getSettingInMicrons("wireframe_top_jump");
-    
+
     fall_down = getSettingInMicrons("wireframe_fall_down");
     drag_along = getSettingInMicrons("wireframe_drag_along");
-    
+
     strategy = STRATEGY_COMPENSATE;
     if (getSettingString("wireframe_strategy") == "Compensate")
         strategy = STRATEGY_COMPENSATE;
@@ -529,15 +526,15 @@ Wireframe2gcode::Wireframe2gcode(Weaver& weaver, GCodeExport& gcode, SettingsBas
         strategy = STRATEGY_KNOT;
     if (getSettingString("wireframe_strategy") == "Retract")
         strategy = STRATEGY_RETRACT;
-    
+
     go_back_to_last_top = false;
     straight_first_when_going_down = getSettingInPercentage("wireframe_straight_before_down");
-    
+
     roof_fall_down = getSettingInMicrons("wireframe_roof_fall_down");
     roof_drag_along = getSettingInMicrons("wireframe_roof_drag_along");
     roof_outer_delay = getSettingInSeconds("wireframe_roof_outer_delay");
-    
-    
+
+
     standard_retraction_config.distance = getSettingInMillimeters("retraction_amount");
     standard_retraction_config.prime_volume = std::max(0.0, getSettingInCubicMillimeters("retraction_extra_prime_amount"));
     standard_retraction_config.speed = getSettingInMillimetersPerSecond("retraction_retract_speed");
@@ -552,14 +549,11 @@ void Wireframe2gcode::processStartingCode()
 {
     int start_extruder_nr = getSettingAsIndex("adhesion_extruder_nr");
 
-    if (!CommandSocket::isInstantiated())
-    {
-        std::vector<bool> extruder_is_used;
-        extruder_is_used.resize(getSettingAsCount("machine_extruder_count"), false);
-        extruder_is_used[start_extruder_nr] = true;
-        std::string prefix = gcode.getFileHeader(extruder_is_used);
-        gcode.writeCode(prefix.c_str());
-    }
+    std::vector<bool> extruder_is_used;
+    extruder_is_used.resize(getSettingAsCount("machine_extruder_count"), false);
+    extruder_is_used[start_extruder_nr] = true;
+    std::string prefix = gcode.getFileHeader(extruder_is_used);
+    gcode.writeCode(prefix.c_str());
 
     gcode.writeComment("Generated with Cura_SteamEngine " VERSION);
 
@@ -603,7 +597,6 @@ void Wireframe2gcode::processStartingCode()
     else if (gcode.getFlavor() == EGCodeFlavor::GRIFFIN)
     { // initialize extruder trains
         gcode.writeCode("T0"); // Toolhead already assumed to be at T0, but writing it just to be safe...
-        CommandSocket::setSendCurrentPosition(gcode.getPositionXY());
         gcode.startExtruder(start_extruder_nr);
         constexpr bool wait = true;
         gcode.writeTemperatureCommand(start_extruder_nr, getSettingInDegreeCelsius("material_print_temperature"), wait);
@@ -644,4 +637,4 @@ void Wireframe2gcode::finalize()
     for(int e=0; e<getSettingAsCount("machine_extruder_count"); e++)
         gcode.writeTemperatureCommand(e, 0, false);
 }
-}//namespace cura    
+}//namespace cura
